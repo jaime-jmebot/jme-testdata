@@ -1,0 +1,24 @@
+name: Verify build
+
+on:
+  push:
+    branches: ['**']
+    tags-ignore: ['**']
+  pull_request:
+
+jobs:
+  build:
+    name: Assemble the test data artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the repo
+        uses: actions/checkout@v4
+
+      - name: Setup the java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Assemble
+        run: ./gradlew :jme3-testdata:assemble --console=plain --stacktrace

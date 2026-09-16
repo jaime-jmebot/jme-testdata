@@ -1,0 +1,68 @@
+// jme3-testdata: resources-only module published to Maven Central as
+// org.jmonkeyengine:jme3-testdata (same coordinates as the former engine module).
+
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+group = 'org.jmonkeyengine'
+version = rootProject.version
+
+task sourcesJar(type: Jar, dependsOn: classes, description: 'Creates a jar from the source files.') {
+    archiveClassifier = 'sources'
+    from sourceSets.main.allSource
+}
+
+task javadocJar(type: Jar, description: 'Creates an (empty) javadoc jar.') {
+    archiveClassifier = 'javadoc'
+}
+
+tasks.named('assemble') {
+    dependsOn sourcesJar
+    dependsOn javadocJar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            artifact javadocJar
+            artifact sourcesJar
+            from components.java
+            pom {
+                name = POM_NAME
+                description = POM_DESCRIPTION
+                url = POM_URL
+                inceptionYear = POM_INCEPTION_YEAR
+                scm {
+                    url = POM_SCM_URL
+                    connection = POM_SCM_CONNECTION
+                    developerConnection = POM_SCM_DEVELOPER_CONNECTION
+                }
+                licenses {
+                    license {
+                        name = POM_LICENSE_NAME
+                        url = POM_LICENSE_URL
+                        distribution = POM_LICENSE_DISTRIBUTION
+                    }
+                }
+                developers {
+                    developer {
+                        name = 'jMonkeyEngine Team'
+                        id = 'jMonkeyEngine'
+                    }
+                }
+            }
+            version = project.version
+        }
+    }
+}
+
+signing {
+    def signingKey = findProperty('signingKey')
+    def signingPassword = findProperty('signingPassword')
+    useInMemoryPgpKeys(signingKey, signingPassword)
+    sign publishing.publications.maven
+}
+tasks.withType(Sign) {
+    onlyIf { hasProperty('signingKey') }
+}

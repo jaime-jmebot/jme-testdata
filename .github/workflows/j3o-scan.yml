@@ -1,0 +1,52 @@
+name: J3O Scan
+
+# Security gate: every .j3o in the repo is validated against the engine's
+# allow-list of Savable classes without instantiating any of them, so a
+# tampered asset can't smuggle unexpected classes into the examples/tests
+# that load it. The scanner and baseline always come from the engine itself
+# (shallow clone) — no duplicated code in this repo.
+on:
+  pull_request:
+    paths:
+      - '**/*.j3o'
+      - '.github/workflows/j3o-scan.yml'
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - '**/*.j3o'
+      - '.github/workflows/j3o-scan.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  scan-j3o:
+    name: Validate J3O assets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the test data
+        uses: actions/checkout@v4
+        with:
+          path: testdata
+
+      - name: Clone the engine (shallow)
+        run: git clone --depth 1 https://github.com/jMonkeyEngine/jmonkeyengine.git engine
+
+      - name: Setup the java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Compile the engine J3O scanner
+        run: |
+          mkdir -p scanner-classes
+          javac -d scanner-classes engine/jme3-desktop/src/main/java/com/jme3/system/J3OScanner.java
+
+      - name: Scan J3O assets
+        run: |
+          java -cp scanner-classes com.jme3.system.J3OScanner \
+            --baseline engine/jme3-desktop/src/main/resources/com/jme3/system/j3o-baseline.txt \
+            testdata
