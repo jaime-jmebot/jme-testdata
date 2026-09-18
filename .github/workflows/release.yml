@@ -1,8 +1,10 @@
 name: Release to Maven Central
 
-# Pushing a tag like v3.10.0 publishes org.jmonkeyengine:jme3-testdata:<version>
-# to Sonatype. Finish the release in the Central Publisher Portal
-# (https://central.sonatype.com/publishing/deployments), same as the engine.
+# Pushing a tag like v3.10.0 publishes org.jmonkeyengine:jme3-testdata:3.10.0
+# to Sonatype: the published version is the tag name with the leading 'v'
+# stripped, exactly like the engine (see version.gradle). Finish the release
+# in the Central Publisher Portal (https://central.sonatype.com/publishing/deployments),
+# same as the engine.
 on:
   push:
     tags:
@@ -38,4 +40,5 @@ jobs:
             exit 1
           fi
           ./gradlew publishToSonatype closeSonatypeStagingRepository \
+            -PtestdataVersion="${GITHUB_REF_NAME#v}" \
             --console=plain --stacktrace
