@@ -22,3 +22,6 @@ jobs:
 
       - name: Assemble
         run: ./gradlew :jme3-testdata:assemble --console=plain --stacktrace
+
+      - name: Test the release version helper
+        run: bash scripts/next-version-test.sh

@@ -1,0 +1,51 @@
+name: Publish snapshot to Maven Central
+
+# Every commit that lands on the default branch publishes a snapshot of
+# org.jmonkeyengine:jme3-testdata to Sonatype, using the same date based
+# versioning as the releases (scripts/next-version.sh) plus the -SNAPSHOT
+# qualifier: <YYYY-MM-DD>-SNAPSHOT.
+#
+# Contrary to the releases, no tag and no GitHub release are created, and the
+# version is not numbered: a Maven snapshot can be republished, so every commit
+# of the day simply updates the <YYYY-MM-DD>-SNAPSHOT version.
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  snapshot:
+    name: Publish snapshot to Sonatype
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the repo
+        uses: actions/checkout@v4
+
+      - name: Compute the snapshot version
+        id: version
+        run: echo "version=$(bash scripts/next-version.sh --snapshot)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup the java environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Publish the snapshot
+        env:
+          ORG_GRADLE_PROJECT_centralUsername: ${{ secrets.CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_centralPassword: ${{ secrets.CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ "${ORG_GRADLE_PROJECT_centralUsername}" = "" ] || \
+             [ "${ORG_GRADLE_PROJECT_centralPassword}" = "" ] || \
+             [ "${ORG_GRADLE_PROJECT_signingKey}" = "" ] || \
+             [ "${ORG_GRADLE_PROJECT_signingPassword}" = "" ]; then
+            echo "Configure the following secrets to enable uploading to Sonatype:"
+            echo "CENTRAL_USERNAME, CENTRAL_PASSWORD, SIGNING_KEY, SIGNING_PASSWORD"
+            exit 1
+          fi
+          ./gradlew publishToSonatype \
+            -PtestdataVersion="${{ steps.version.outputs.version }}" \
+            --console=plain --stacktrace

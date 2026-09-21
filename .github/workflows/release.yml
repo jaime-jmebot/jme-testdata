@@ -1,22 +1,61 @@
 name: Release to Maven Central
 
-# Pushing a tag like v3.10.0 publishes org.jmonkeyengine:jme3-testdata:3.10.0
-# to Sonatype: the published version is the tag name with the leading 'v'
-# stripped, exactly like the engine (see version.gradle). Finish the release
-# in the Central Publisher Portal (https://central.sonatype.com/publishing/deployments),
-# same as the engine.
+# Releases are started by hand, with the "Run workflow" button of this workflow
+# (workflow_dispatch).
+#
+# The version is the day of the release, in YYYY-MM-DD form: the run computes it,
+# pushes the matching tag, creates the GitHub release with the same name and only
+# then publishes org.jmonkeyengine:jme3-testdata:<version> to Maven Central.
+#
+# Several releases on the same day are numbered by scripts/next-version.sh, which
+# looks at the tags that already exist:
+#
+#   2026-09-19, 2026-09-19-2, 2026-09-19-3 ... and the counter resets the next
+#   day: 2026-09-20, 2026-09-20-2 ...
+#
+# Finish the release in the Central Publisher Portal
+# (https://central.sonatype.com/publishing/deployments), same as the engine.
+
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+
+# One release at a time, so that two runs can't come up with the same version.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Needed to push the tag and to create the GitHub release.
+permissions:
+  contents: write
 
 jobs:
-  publish:
-    name: Publish to Sonatype
+  release:
+    name: Tag, release and publish to Sonatype
     runs-on: ubuntu-latest
     steps:
       - name: Clone the repo
         uses: actions/checkout@v4
+        with:
+          # the version counter is computed from the tags that already exist
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Compute the release version
+        id: version
+        run: echo "version=$(bash scripts/next-version.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Push the tag and create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version='${{ steps.version.outputs.version }}'
+          echo "Releasing ${version}"
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f ref="refs/tags/${version}" \
+            -f sha="${GITHUB_SHA}"
+          gh release create "${version}" \
+            --title "${version}" \
+            --generate-notes
 
       - name: Setup the java environment
         uses: actions/setup-java@v4
@@ -40,5 +79,5 @@ jobs:
             exit 1
           fi
           ./gradlew publishToSonatype closeSonatypeStagingRepository \
-            -PtestdataVersion="${GITHUB_REF_NAME#v}" \
+            -PtestdataVersion="${{ steps.version.outputs.version }}" \
             --console=plain --stacktrace
